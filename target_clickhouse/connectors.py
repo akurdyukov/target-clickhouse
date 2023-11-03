@@ -16,6 +16,7 @@ from target_clickhouse.engine_class import SupportedEngines, create_engine_wrapp
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
 
+
 class ClickhouseConnector(SQLConnector):
     """Clickhouse Meltano Connector.
 
@@ -35,7 +36,23 @@ class ClickhouseConnector(SQLConnector):
         Args:
             config: The configuration for the connector.
         """
-        return super().get_sqlalchemy_url(config)
+        if config['driver'] == 'http':
+            if config['secure']:
+                secure_options = f"protocol=https&verify={config['verify']}"
+
+                if not config['verify']:
+                    # disable urllib3 warning
+                    import urllib3
+                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            else:
+                secure_options = "protocol=http"
+        else:
+            secure_options = f"secure={config['secure']}&verify={config['verify']}"
+        return (
+            f"clickhouse+{config['driver']}://{config['username']}:{config['password']}@"
+            f"{config['host']}:{config['port']}/"
+            f"{config['database']}?{secure_options}"
+        )
 
     def create_engine(self) -> Engine:
         """Create a SQLAlchemy engine for clickhouse."""
@@ -134,7 +151,7 @@ class ClickhouseConnector(SQLConnector):
         _ = Table(table_name, meta, *columns, table_engine, **table_args)
         meta.create_all(self._engine)
 
-    def prepare_schema(self, _: str) -> None:
+    def prepare_schema(self, schema_name: str) -> None:
         """Create the target database schema.
 
         In Clickhouse, a schema is a database, so this method is a no-op.

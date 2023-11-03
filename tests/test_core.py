@@ -10,7 +10,14 @@ from singer_sdk.testing import get_target_test_class
 from target_clickhouse.target import TargetClickhouse
 
 SAMPLE_CONFIG: dict[str, t.Any] = {
-    "sqlalchemy_url": "clickhouse+http://default:@localhost:18123",
+    "driver": "http",
+    "host": "localhost",
+    "port": 18123,
+    "username": "default",
+    "password": "",
+    "database": "default",
+    "secure": False,
+    "verify": False,
     "table_name": "test_table",
 }
 
