@@ -26,7 +26,7 @@ tox = "^4.12.1"
 ruff = "^0.1.14"
 singer-sdk = { version=">=0.28,<0.35", extras = ["testing"] }
 types-simplejson = "^3.19.0.1"
-types-setuptools = "^69.0.0.20240115"
+types-setuptools = "^69.5.0.20240415"
 pre-commit = "^3.5.0"
 
 [tool.poetry.extras]
