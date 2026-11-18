@@ -59,3 +59,14 @@ SpreadTargetTests = get_target_test_class(
 
 class TestSpreadTargetClickhouse(SpreadTargetTests):  # type: ignore[misc, valid-type]
     """Standard Target Tests."""
+
+
+NativeTargetTests = get_target_test_class(
+    target_class=TargetClickhouse,
+    config=TEST_CONFIG_NATIVE,
+    custom_suites=[custom_target_test_suite],
+)
+
+
+class TestNativeTargetClickhouse(NativeTargetTests):  # type: ignore[misc, valid-type]
+    """Standard Target Tests using the native (TCP) driver."""

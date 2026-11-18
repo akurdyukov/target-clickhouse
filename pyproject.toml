@@ -63,6 +63,10 @@ select = ["ALL"]
 src = ["target_clickhouse"]
 target-version = "py37"
 
+[tool.ruff.per-file-ignores]
+# Tests build SQL from their own fixed table names.
+"tests/*" = ["S608"]
+
 [tool.ruff.flake8-annotations]
 allow-star-arg-any = true
 
