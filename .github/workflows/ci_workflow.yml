@@ -59,10 +59,7 @@ jobs:
         poetry install
     - name: Test with pytest
       run: |
-        poetry run pytest \
-          --capture=no \
-          --deselect=tests/test_core.py::TestTargetClickhouse::test_target_camelcase \
-          --deselect=tests/test_core.py::TestTargetClickhouse::test_target_camelcase_complex_schema
+        poetry run pytest --capture=no
 
   integration:
     runs-on: ubuntu-latest
