@@ -11,7 +11,6 @@ from clickhouse_sqlalchemy import (
 from clickhouse_sqlalchemy import (
     types as clickhouse_sqlalchemy_types,
 )
-from pkg_resources import get_distribution, parse_version
 from singer_sdk import typing as th
 from singer_sdk.connectors import SQLConnector
 from sqlalchemy import Column, MetaData, create_engine
@@ -40,17 +39,24 @@ class ClickhouseConnector(SQLConnector):
 
         Args:
             config: The configuration for the connector.
+
         """
         if config.get("sqlalchemy_url"):
             return super().get_sqlalchemy_url(config)
 
         if config["driver"] == "http":
             if config["secure"]:
-                secure_options = f"protocol=https&verify={config['verify']}"
+                secure_options = "protocol=https"
 
                 if not config["verify"]:
+                    # The http driver only converts verify=False to a boolean; any
+                    # other value reaches `requests` as a CA bundle path. So omit
+                    # it when verifying (requests verifies by default).
+                    secure_options += "&verify=False"
+
                     # disable urllib3 warning
                     import urllib3
+
                     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
             else:
                 secure_options = "protocol=http"
@@ -68,15 +74,23 @@ class ClickhouseConnector(SQLConnector):
 
     @contextlib.contextmanager
     def _connect(self) -> typing.Iterator[sqlalchemy.engine.Connection]:
-        # patch to overcome error in sqlalchemy-clickhouse driver
-        if self.config.get("driver") == "native":
-            kwargs = {"stream_results": True, "max_row_buffer": 1000}
+        # The SDK's default _connect sets stream_results=True. With the native
+        # driver that makes the cursor use clickhouse_driver's execute_iter, which
+        # cannot run INSERTs with a batch of rows ("Parameters are expected in
+        # dict form"). So don't stream results with the native driver, however it
+        # was selected (`driver` setting or a clickhouse+native sqlalchemy_url).
+        if self._engine.url.get_driver_name() == "native":
+            kwargs = {}
         else:
             kwargs = {"stream_results": True}
         with self._engine.connect().execution_options(**kwargs) as conn:
             yield conn
 
-    def to_sql_type(self, jsonschema_type: dict) -> sqlalchemy.types.TypeEngine:
+    def to_sql_type(
+        self,
+        jsonschema_type: dict,
+        **kwargs,
+    ) -> sqlalchemy.types.TypeEngine:
         """Return a JSON Schema representation of the provided type.
 
         Developers may override this method to accept additional input argument types,
@@ -87,29 +101,63 @@ class ClickhouseConnector(SQLConnector):
 
         Returns:
             The SQLAlchemy type representation of the data type.
+
         """
         sql_type = th.to_sql_type(jsonschema_type)
+        is_primary_key = kwargs.get("is_primary_key", False)
 
         # Clickhouse does not support the DECIMAL type without providing precision,
-        # so we need to use the FLOAT type.
+        # so use a float. It must be Float64: a generic FLOAT is Float32 in
+        # ClickHouse and keeps only ~7 significant digits.
         if type(sql_type) == sqlalchemy.types.DECIMAL:
             sql_type = typing.cast(
-                sqlalchemy.types.TypeEngine, sqlalchemy.types.FLOAT(),
+                sqlalchemy.types.TypeEngine,
+                clickhouse_sqlalchemy_types.Float64(),
             )
         elif type(sql_type) == sqlalchemy.types.INTEGER:
             sql_type = typing.cast(
-                sqlalchemy.types.TypeEngine, clickhouse_sqlalchemy_types.Int64(),
+                sqlalchemy.types.TypeEngine,
+                clickhouse_sqlalchemy_types.Int64(),
             )
+        elif type(sql_type) == sqlalchemy.types.DATE:
+            sql_type = typing.cast(
+                sqlalchemy.types.TypeEngine,
+                clickhouse_sqlalchemy_types.Nullable(clickhouse_sqlalchemy_types.Date32)
+                if not is_primary_key
+                else clickhouse_sqlalchemy_types.Date32,
+            )
+        # All date and time types should be flagged as Nullable to allow for NULL value.
+        elif (
+            type(sql_type)
+            in [
+                sqlalchemy.types.TIMESTAMP,
+                sqlalchemy.types.TIME,
+                sqlalchemy.types.DATETIME,
+            ]
+            and not is_primary_key
+        ):
+            sql_type = clickhouse_sqlalchemy_types.Nullable(sql_type)
+
+        # Wrap any type in Nullable if the JSON schema allows null values
+        # and it's not already Nullable and not a primary key.
+        schema_type = jsonschema_type.get("type", [])
+        if (
+            isinstance(schema_type, list)
+            and "null" in schema_type
+            and not is_primary_key
+            and not isinstance(sql_type, clickhouse_sqlalchemy_types.Nullable)
+        ):
+            sql_type = clickhouse_sqlalchemy_types.Nullable(sql_type)
 
         return sql_type
 
     def create_empty_table(
-            self,
-            full_table_name: str,
-            schema: dict,
-            primary_keys: list[str] | None = None,
-            partition_keys: list[str] | None = None,
-            as_temp_table: bool = False,  # noqa: FBT001, FBT002
+        self,
+        full_table_name: str,
+        schema: dict,
+        primary_keys: list[str] | None = None,
+        partition_keys: list[str] | None = None,
+        as_temp_table: bool = False,
     ) -> None:
         """Create an empty target table, using Clickhouse Engine.
 
@@ -123,6 +171,7 @@ class ClickhouseConnector(SQLConnector):
         Raises:
             NotImplementedError: if temp tables are unsupported and as_temp_table=True.
             RuntimeError: if a variant schema is passed with no properties defined.
+
         """
         if as_temp_table:
             msg = "Temporary tables are not supported."
@@ -137,14 +186,7 @@ class ClickhouseConnector(SQLConnector):
             table_name = self.config.get("table_name")
 
         # Do not set schema, as it is not supported by Clickhouse.
-        # Get the version of sqlalchemy
-        sqlalchemy_version = get_distribution("sqlalchemy").version
-        parsed_version = parse_version(sqlalchemy_version)
-        if parsed_version < parse_version("2.0"):
-            # Code for sqlalchemy 1.0 compatibility.
-            meta = MetaData(schema=None, bind=self._engine)
-        else:
-            meta = MetaData(schema=None)
+        meta = MetaData(schema=None)
 
         columns: list[Column] = []
         primary_keys = primary_keys or []
@@ -162,10 +204,14 @@ class ClickhouseConnector(SQLConnector):
             raise RuntimeError(msg) from e
         for property_name, property_jsonschema in properties.items():
             is_primary_key = property_name in primary_keys
+            sql_type = self.to_sql_type(
+                property_jsonschema,
+                is_primary_key=is_primary_key,
+            )
             columns.append(
                 Column(
                     property_name,
-                    self.to_sql_type(property_jsonschema),
+                    sql_type,
                     primary_key=is_primary_key,
                 ),
             )
@@ -175,6 +221,7 @@ class ClickhouseConnector(SQLConnector):
             primary_keys=primary_keys,
             table_name=table_name,
             config=self.config,
+            order_by_keys=self.config.get("order_by_keys"),
         )
 
         table_args = {}
@@ -191,14 +238,49 @@ class ClickhouseConnector(SQLConnector):
 
         Args:
             schema_name: The target schema name.
+
         """
         return
 
+    def _adapt_column_type(
+        self,
+        full_table_name: str,
+        column_name: str,
+        sql_type: sqlalchemy.types.TypeEngine,
+    ) -> None:
+        """Adapt a column's type, also widening Float32 columns to Float64.
+
+        Older versions created JSON `number` columns as Float32. The SDK's generic
+        type merging doesn't treat Float32 -> Float64 as a widening, so handle it
+        here; everything else goes to the SDK.
+        """
+        current_type = self._get_column_type(full_table_name, column_name)
+        if _float_type(current_type) is clickhouse_sqlalchemy_types.Float32 and (
+            _float_type(sql_type) is clickhouse_sqlalchemy_types.Float64
+        ):
+            new_type: sqlalchemy.types.TypeEngine
+            new_type = clickhouse_sqlalchemy_types.Float64()
+            if isinstance(
+                current_type,
+                clickhouse_sqlalchemy_types.Nullable,
+            ) or isinstance(sql_type, clickhouse_sqlalchemy_types.Nullable):
+                new_type = clickhouse_sqlalchemy_types.Nullable(new_type)
+            alter_ddl = self.get_column_alter_ddl(
+                table_name=full_table_name,
+                column_name=column_name,
+                column_type=new_type.compile(dialect=self._engine.dialect),
+            )
+            with self._connect() as conn, conn.begin():
+                conn.execute(alter_ddl)
+            return
+
+        super()._adapt_column_type(full_table_name, column_name, sql_type)
+
     def prepare_column(
-            self,
-            full_table_name: str,
-            column_name: str,
-            sql_type: sqlalchemy.types.TypeEngine,
+        self,
+        full_table_name: str,
+        column_name: str,
+        sql_type: sqlalchemy.types.TypeEngine,
     ) -> None:
         """Adapt target table to provided schema if possible.
 
@@ -206,6 +288,7 @@ class ClickhouseConnector(SQLConnector):
             full_table_name: the target table name.
             column_name: the target column name.
             sql_type: the SQLAlchemy type.
+
         """
         if not self.column_exists(full_table_name, column_name):
             self._create_empty_column(
@@ -224,9 +307,9 @@ class ClickhouseConnector(SQLConnector):
 
     @staticmethod
     def get_column_add_ddl(
-            table_name: str,
-            column_name: str,
-            column_type: sqlalchemy.types.TypeEngine,
+        table_name: str,
+        column_name: str,
+        column_type: sqlalchemy.types.TypeEngine,
     ) -> sqlalchemy.DDL:
         """Get the create column DDL statement.
 
@@ -239,6 +322,7 @@ class ClickhouseConnector(SQLConnector):
 
         Returns:
             A sqlalchemy DDL instance.
+
         """
         create_column_clause = sqlalchemy.schema.CreateColumn(
             sqlalchemy.Column(
@@ -258,10 +342,10 @@ class ClickhouseConnector(SQLConnector):
         )
 
     def get_column_alter_ddl(
-            self,
-            table_name: str,
-            column_name: str,
-            column_type: sqlalchemy.types.TypeEngine,
+        self,
+        table_name: str,
+        column_name: str,
+        column_type: sqlalchemy.types.TypeEngine,
     ) -> sqlalchemy.DDL:
         """Get the alter column DDL statement.
 
@@ -274,6 +358,7 @@ class ClickhouseConnector(SQLConnector):
 
         Returns:
             A sqlalchemy DDL instance.
+
         """
         if self.config.get("cluster_name"):
             return sqlalchemy.DDL(
@@ -296,3 +381,16 @@ class ClickhouseConnector(SQLConnector):
                 "column_type": column_type,
             },
         )
+
+
+def _float_type(sql_type: sqlalchemy.types.TypeEngine) -> type | None:
+    """Return Float32/Float64 for a (possibly Nullable) ClickHouse float type."""
+    if isinstance(sql_type, clickhouse_sqlalchemy_types.Nullable):
+        sql_type = sql_type.nested_type
+    for float_class in (
+        clickhouse_sqlalchemy_types.Float32,
+        clickhouse_sqlalchemy_types.Float64,
+    ):
+        if type(sql_type) is float_class:
+            return float_class
+    return None
