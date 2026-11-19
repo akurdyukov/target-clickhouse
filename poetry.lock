@@ -1807,14 +1807,14 @@ testing = ["flaky (>=3.4.0)", "freezegun (>=0.3.11)", "pathlib2 (>=2.3.3) ; pyth
 
 [[package]]
 name = "types-setuptools"
-version = "69.5.0.20240513"
+version = "84.2.0.20261104"
 description = "Typing stubs for setuptools"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["dev"]
 files = [
-    {file = "types-setuptools-69.5.0.20240513.tar.gz", hash = "sha256:3a8ccea3e3f1f639856a1dd622be282f74e94e00fdc364630240f999cc9594fc"},
-    {file = "types_setuptools-69.5.0.20240513-py3-none-any.whl", hash = "sha256:bd3964c08cffd5a057d9cabe61641c86a41a1b5dd2b652b8d371eed64d89d726"},
+    {file = "types_setuptools-84.2.0.20261104-py3-none-any.whl", hash = "sha256:23e9bf876adca8df2285a68f76c355128b1e679b27cfec4854faf350cd7999e5"},
+    {file = "types_setuptools-84.2.0.20261104.tar.gz", hash = "sha256:1ec758bbeddf88d52f963fe663beabc2117b6aae73cf3d2902d7dd0df81bd76e"},
 ]
 
 [[package]]
@@ -2090,4 +2090,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.14"
-content-hash = "b56767b9d5d73cfad3cfca1c3825682b4caa7c15b8e75bf66899fd8f7aeb2112"
+content-hash = "b1c5df19519c09fbf28afbb16776e6dc7357fec65e8eaf1ef97e87bf9c36208d"
