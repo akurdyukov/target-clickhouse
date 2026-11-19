@@ -130,6 +130,16 @@ def test_replicated_engine_requires_settings(missing):
         )
 
 
+def test_replicated_engine_without_config_raises_clear_error():
+    """Without config, replicated engines report the missing setting."""
+    with pytest.raises(ValueError, match="table_path"):
+        create_engine_wrapper(
+            engine_type=SupportedEngines.REPLICATED_MERGE_TREE,
+            primary_keys=["id"],
+            table_name="my_table",
+        )
+
+
 def test_unsupported_engine_rejected():
     """Unknown engine names raise instead of silently using a default."""
     with pytest.raises(ValueError, match="not supported"):

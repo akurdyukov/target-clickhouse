@@ -82,6 +82,7 @@ class ClickhouseSink(SQLSink):
             for key, value in record.items():
                 if isinstance(value, (dict, list)):
                     record[key] = json.dumps(value)
+            fill_missing_non_nullable_values(record, schema)
 
         res = super().bulk_insert_records(full_table_name, schema, records)
 
@@ -294,4 +295,47 @@ def pre_validate_for_string_type(
                     f"Converted field {key} to string: {record[key]}",
                 )
 
+    return record
+
+
+# ClickHouse's default value for each non-nullable column type, keyed by JSON
+# schema type. Objects and arrays are stored as JSON strings.
+_JSON_TYPE_DEFAULTS: dict[str, Any] = {
+    "string": "",
+    "object": "",
+    "array": "",
+    "integer": 0,
+    "number": 0.0,
+    "boolean": False,
+}
+# Date/time columns are created Nullable, so missing values stay NULL.
+_NULLABLE_FORMATS = {"date", "date-time", "time"}
+
+
+def fill_missing_non_nullable_values(record: dict, schema: dict) -> dict:
+    """Fill missing values of non-nullable columns with ClickHouse's default.
+
+    Over http, ClickHouse replaces NULL in a non-nullable column with the type's
+    default. The native driver encodes rows client-side and fails on None instead,
+    so apply the same defaults before inserting, for both drivers.
+
+    Args:
+        record: Individual record in the stream (modified in place).
+        schema: JSON schema for the stream.
+
+    Returns:
+        The record.
+    """
+    for name, property_schema in schema.get("properties", {}).items():
+        if record.get(name) is not None:
+            continue
+        json_types = property_schema.get("type", [])
+        if isinstance(json_types, str):
+            json_types = [json_types]
+        if "null" in json_types or property_schema.get("format") in _NULLABLE_FORMATS:
+            continue
+        for json_type in json_types:
+            if json_type in _JSON_TYPE_DEFAULTS:
+                record[name] = _JSON_TYPE_DEFAULTS[json_type]
+                break
     return record

@@ -242,6 +242,40 @@ class ClickhouseConnector(SQLConnector):
         """
         return
 
+    def _adapt_column_type(
+        self,
+        full_table_name: str,
+        column_name: str,
+        sql_type: sqlalchemy.types.TypeEngine,
+    ) -> None:
+        """Adapt a column's type, also widening Float32 columns to Float64.
+
+        Older versions created JSON `number` columns as Float32. The SDK's generic
+        type merging doesn't treat Float32 -> Float64 as a widening, so handle it
+        here; everything else goes to the SDK.
+        """
+        current_type = self._get_column_type(full_table_name, column_name)
+        if _float_type(current_type) is clickhouse_sqlalchemy_types.Float32 and (
+            _float_type(sql_type) is clickhouse_sqlalchemy_types.Float64
+        ):
+            new_type: sqlalchemy.types.TypeEngine
+            new_type = clickhouse_sqlalchemy_types.Float64()
+            if isinstance(
+                current_type,
+                clickhouse_sqlalchemy_types.Nullable,
+            ) or isinstance(sql_type, clickhouse_sqlalchemy_types.Nullable):
+                new_type = clickhouse_sqlalchemy_types.Nullable(new_type)
+            alter_ddl = self.get_column_alter_ddl(
+                table_name=full_table_name,
+                column_name=column_name,
+                column_type=new_type.compile(dialect=self._engine.dialect),
+            )
+            with self._connect() as conn, conn.begin():
+                conn.execute(alter_ddl)
+            return
+
+        super()._adapt_column_type(full_table_name, column_name, sql_type)
+
     def prepare_column(
         self,
         full_table_name: str,
@@ -347,3 +381,16 @@ class ClickhouseConnector(SQLConnector):
                 "column_type": column_type,
             },
         )
+
+
+def _float_type(sql_type: sqlalchemy.types.TypeEngine) -> type | None:
+    """Return Float32/Float64 for a (possibly Nullable) ClickHouse float type."""
+    if isinstance(sql_type, clickhouse_sqlalchemy_types.Nullable):
+        sql_type = sql_type.nested_type
+    for float_class in (
+        clickhouse_sqlalchemy_types.Float32,
+        clickhouse_sqlalchemy_types.Float64,
+    ):
+        if type(sql_type) is float_class:
+            return float_class
+    return None

@@ -31,7 +31,9 @@ class TestDateTypeTargetClickhouse(TargetClickhouseFileTestTemplate):
         for record_id, expected_date in records.items():
             record = next((rec for rec in result if rec[0] == record_id), None)
             assert record is not None, f"Record with id {record_id} not found"
-            assert record[1] == (
+            # The http driver returns dates as strings, the native one as dates.
+            actual = record[1] if record[1] is None else str(record[1])
+            assert actual == (
                 expected_date if expected_date is None else str(expected_date)
             ), f"For record {record_id}, expected {expected_date}, got {record[1]}"
 
