@@ -325,6 +325,7 @@ def fill_missing_non_nullable_values(record: dict, schema: dict) -> dict:
 
     Returns:
         The record.
+
     """
     for name, property_schema in schema.get("properties", {}).items():
         if record.get(name) is not None:
