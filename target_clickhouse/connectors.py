@@ -46,9 +46,14 @@ class ClickhouseConnector(SQLConnector):
 
         if config["driver"] == "http":
             if config["secure"]:
-                secure_options = f"protocol=https&verify={config['verify']}"
+                secure_options = "protocol=https"
 
                 if not config["verify"]:
+                    # The http driver only converts verify=False to a boolean; any
+                    # other value reaches `requests` as a CA bundle path. So omit
+                    # it when verifying (requests verifies by default).
+                    secure_options += "&verify=False"
+
                     # disable urllib3 warning
                     import urllib3
 
@@ -69,9 +74,13 @@ class ClickhouseConnector(SQLConnector):
 
     @contextlib.contextmanager
     def _connect(self) -> typing.Iterator[sqlalchemy.engine.Connection]:
-        # patch to overcome error in sqlalchemy-clickhouse driver
-        if self.config.get("driver") == "native":
-            kwargs = {"stream_results": True, "max_row_buffer": 1000}
+        # The SDK's default _connect sets stream_results=True. With the native
+        # driver that makes the cursor use clickhouse_driver's execute_iter, which
+        # cannot run INSERTs with a batch of rows ("Parameters are expected in
+        # dict form"). So don't stream results with the native driver, however it
+        # was selected (`driver` setting or a clickhouse+native sqlalchemy_url).
+        if self._engine.url.get_driver_name() == "native":
+            kwargs = {}
         else:
             kwargs = {"stream_results": True}
         with self._engine.connect().execution_options(**kwargs) as conn:
@@ -98,11 +107,12 @@ class ClickhouseConnector(SQLConnector):
         is_primary_key = kwargs.get("is_primary_key", False)
 
         # Clickhouse does not support the DECIMAL type without providing precision,
-        # so we need to use the FLOAT type.
+        # so use a float. It must be Float64: a generic FLOAT is Float32 in
+        # ClickHouse and keeps only ~7 significant digits.
         if type(sql_type) == sqlalchemy.types.DECIMAL:
             sql_type = typing.cast(
                 sqlalchemy.types.TypeEngine,
-                sqlalchemy.types.FLOAT(),
+                clickhouse_sqlalchemy_types.Float64(),
             )
         elif type(sql_type) == sqlalchemy.types.INTEGER:
             sql_type = typing.cast(

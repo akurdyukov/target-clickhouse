@@ -86,6 +86,5 @@ def create_engine_wrapper(
                 msg = "Replica name (replica_name) is not defined."
                 raise ValueError(msg)
 
-        engine_class = get_engine_class(engine_type)
-
+    engine_class = get_engine_class(engine_type)
     return engine_class(**engine_args)

@@ -116,12 +116,15 @@ class ClickhouseSink(SQLSink):
                 sql_type=sqlalchemy.types.Integer(),
             )
 
-        if self.config.get("hard_delete", True):
+        if self.config.get("hard_delete", False):
             with self.connector._connect() as conn, conn.begin():  # noqa: SLF001
                 conn.execute(
                     sqlalchemy.text(
                         f"ALTER TABLE {self.full_table_name} DELETE "
-                        f"WHERE {self.version_column_name} <= {new_version}",
+                        # Strictly older versions only: rows of the version being
+                        # activated may already be written (any table larger than
+                        # one batch) and must be kept.
+                        f"WHERE {self.version_column_name} < {new_version}",
                     ),
                 )
             return

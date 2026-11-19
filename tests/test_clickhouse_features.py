@@ -120,6 +120,49 @@ def test_number_keeps_double_precision(engine, table):
     assert "Float64" in _column_types(engine, table)["amount"]
 
 
+def test_existing_float32_column_is_widened(engine, table):
+    """A Float32 column made by older versions is widened and loads full precision."""
+    _query(
+        engine,
+        f"CREATE TABLE {table} (id Int64, amount Float32) "
+        "ENGINE = MergeTree ORDER BY id",
+    )
+    _query(engine, f"INSERT INTO {table} VALUES (1, 1.5)")
+    value = 1234567.891
+    schema = {
+        "type": "object",
+        "properties": {"id": {"type": "integer"}, "amount": {"type": "number"}},
+    }
+    _run_target(
+        {},
+        [_schema(table, schema), _record(table, {"id": 2, "amount": value})],
+    )
+    _wait_for_mutations(engine, table)
+
+    assert "Float64" in _column_types(engine, table)["amount"]
+    assert _query(engine, f"SELECT id, amount FROM {table} ORDER BY id") == [
+        (1, 1.5),
+        (2, value),
+    ]
+
+
+def test_native_driver_via_sqlalchemy_url(engine, table):
+    """A clickhouse+native sqlalchemy_url can insert, not just the driver setting."""
+    _run_target(
+        {"sqlalchemy_url": "clickhouse+native://default:@localhost:19000/default"},
+        [
+            _schema(table, ID_VALUE_SCHEMA),
+            _record(table, {"id": 1, "value": "a"}),
+            _record(table, {"id": 2, "value": "b"}),
+        ],
+    )
+
+    assert _query(engine, f"SELECT id, value FROM {table} ORDER BY id") == [
+        (1, "a"),
+        (2, "b"),
+    ]
+
+
 def test_table_name_setting_overrides_stream_name(engine, table):
     """With table_name set, records go to that table, not to the stream's name."""
     stream = f"{table}_stream"
