@@ -18,7 +18,7 @@ python = ">=3.11,<3.14"
 singer-sdk = { version=">=0.54,<0.55" }
 clickhouse-sqlalchemy = { git = "https://github.com/xzkostyan/clickhouse-sqlalchemy.git", rev = "7ad94b0" }
 
-simplejson = "^3.19.2"
+simplejson = ">=3.19.2,<5.0.0"
 pendulum = ">=2.1,<4"
 packaging = ">=24.0"
 
