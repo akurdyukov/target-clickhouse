@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Singer target that loads data into ClickHouse, built on the Meltano Singer SDK (`singer-sdk` `>=0.40,<0.45`) and `clickhouse-sqlalchemy` (pinned to a git commit in `pyproject.toml`). Published to PyPI as `shaped-target-clickhouse`; the CLI entry point is `target-clickhouse` (`target_clickhouse.target:TargetClickhouse.cli`). Python `>=3.11,<3.12` (3.11 only); if the system Python is newer, `poetry python install 3.11 && poetry env use 3.11` (Poetry refuses to lock or install with an out-of-range interpreter).
+Singer target that loads data into ClickHouse, built on the Meltano Singer SDK (`singer-sdk` `>=0.40,<0.45`) and `clickhouse-sqlalchemy` (pinned to a git commit in `pyproject.toml`). Published to PyPI as `shaped-target-clickhouse`; the CLI entry point is `target-clickhouse` (`target_clickhouse.target:TargetClickhouse.cli`). Python `>=3.11,<3.14`; with an out-of-range system Python, `poetry python install 3.13 && poetry env use 3.13` (Poetry refuses to lock or install with an out-of-range interpreter).
 
 ## Commands
 
@@ -21,7 +21,7 @@ meltano run tap-smoke-test target-clickhouse   # end-to-end smoke test (CI "inte
 
 - Tests in `tests/test_core.py` and `tests/test_clickhouse_features.py` need a live ClickHouse on port 18123 (and 19000 for the native driver). `test_engine_class.py`, `test_connection_url.py`, `test_missing_values.py`, `test_nullable_types.py` and `test_validation.py` are pure unit tests and need no DB.
 - Ruff runs with `select = ["ALL"]` plus an ignore list in `pyproject.toml`; pre-commit also runs mypy.
-- CI tests Python 3.11 against `clickhouse/clickhouse-server:23.4-alpine`; lint and the Meltano integration job also run on 3.11.
+- CI tests Python 3.11, 3.12 and 3.13 against `clickhouse/clickhouse-server:23.4-alpine`; lint and the Meltano integration job run on 3.11.
 - `setuptools` is capped at `<=70.3.0` by singer-sdk 0.44, so its Dependabot alerts need a singer-sdk upgrade (beyond the current `<0.45` pin).
 - Releases: creating a GitHub release triggers `release_workflow.yml`, which uses `poetry-dynamic-versioning` (version comes from the git tag) and publishes to PyPI.
 
