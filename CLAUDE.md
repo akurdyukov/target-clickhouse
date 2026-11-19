@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Singer target that loads data into ClickHouse, built on the Meltano Singer SDK (`singer-sdk` `>=0.40,<0.45`) and `clickhouse-sqlalchemy` (pinned to a git commit in `pyproject.toml`). Published to PyPI as `shaped-target-clickhouse`; the CLI entry point is `target-clickhouse` (`target_clickhouse.target:TargetClickhouse.cli`). Python `>=3.11,<3.14`; with an out-of-range system Python, `poetry python install 3.13 && poetry env use 3.13` (Poetry refuses to lock or install with an out-of-range interpreter).
+Singer target that loads data into ClickHouse, built on the Meltano Singer SDK (`singer-sdk` `>=0.54,<0.55`; import SQL classes from `singer_sdk.sql`, the old `singer_sdk.connectors`/`singer_sdk.sinks` paths go away in 0.57) and `clickhouse-sqlalchemy` (pinned to a git commit in `pyproject.toml`). Published to PyPI as `shaped-target-clickhouse`; the CLI entry point is `target-clickhouse` (`target_clickhouse.target:TargetClickhouse.cli`). Python `>=3.11,<3.14`; with an out-of-range system Python, `poetry python install 3.13 && poetry env use 3.13` (Poetry refuses to lock or install with an out-of-range interpreter).
 
 ## Commands
 
@@ -23,7 +23,7 @@ meltano run tap-smoke-test target-clickhouse   # end-to-end smoke test (CI "inte
 - Tests in `tests/test_core.py` and `tests/test_clickhouse_features.py` need a live ClickHouse on port 18123 (and 19000 for the native driver). `test_engine_class.py`, `test_connection_url.py`, `test_missing_values.py`, `test_nullable_types.py` and `test_validation.py` are pure unit tests and need no DB.
 - Ruff runs with `select = ["ALL"]` plus an ignore list in `pyproject.toml`; pre-commit also runs mypy.
 - CI runs pytest for every combination of Python 3.11/3.12/3.13 and ClickHouse 23.4/26.3/26.8 (`-alpine` images, with `CLICKHOUSE_SKIP_USER_SETUP=1` because newer images block network logins for the passwordless `default` user). Lint and the Meltano integration job run on Python 3.11, integration against ClickHouse 26.8.
-- `setuptools` is capped at `<=70.3.0` by singer-sdk 0.44, so its Dependabot alerts need a singer-sdk upgrade (beyond the current `<0.45` pin).
+- Recent setuptools no longer ships `pkg_resources`; avoid dependencies that import it (the old pyfilesystem2 `fs` package does, which is why the unused `s3` extra was removed).
 - Releases: creating a GitHub release triggers `release_workflow.yml`, which uses `poetry-dynamic-versioning` (version comes from the git tag) and publishes to PyPI.
 
 ## Architecture
