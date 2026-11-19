@@ -15,11 +15,11 @@ from singer_sdk.helpers._compat import (
     time_fromisoformat,
 )
 from singer_sdk.helpers._typing import (
-    DatetimeErrorTreatmentEnum,
     get_datelike_property_type,
     handle_invalid_timestamp_in_record,
 )
-from singer_sdk.sinks import SQLSink
+from singer_sdk.helpers.conform import DatetimeErrorTreatmentEnum
+from singer_sdk.sql import SQLSink
 from sqlalchemy.sql.expression import bindparam
 
 from target_clickhouse.connectors import ClickhouseConnector

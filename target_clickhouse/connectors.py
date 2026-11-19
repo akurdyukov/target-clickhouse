@@ -12,7 +12,7 @@ from clickhouse_sqlalchemy import (
     types as clickhouse_sqlalchemy_types,
 )
 from singer_sdk import typing as th
-from singer_sdk.connectors import SQLConnector
+from singer_sdk.sql import SQLConnector
 from sqlalchemy import Column, MetaData, create_engine
 
 from target_clickhouse.engine_class import SupportedEngines, create_engine_wrapper
