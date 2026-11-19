@@ -28,18 +28,28 @@ jobs:
         poetry run tox -e lint
 
   pytest:
+    name: pytest (py${{ matrix.python-version }}, ClickHouse ${{ matrix.clickhouse-version }})
     runs-on: ubuntu-latest
     services:
       clickhouse-server:
-        image: clickhouse/clickhouse-server:23.4-alpine
+        image: clickhouse/clickhouse-server:${{ matrix.clickhouse-version }}-alpine
+        env:
+          # Newer images reject network logins for the passwordless default
+          # user; the tests connect as default with no password via the port.
+          CLICKHOUSE_SKIP_USER_SETUP: "1"
         ports:
           - 18123:8123
           - 19000:9000
+        options: >-
+          --health-cmd "clickhouse-client --query 'SELECT 1'"
+          --health-interval 2s --health-timeout 5s --health-retries 30
     strategy:
       fail-fast: false
       matrix:
         # Must match the python range in pyproject.toml (>=3.11,<3.14).
         python-version: ["3.11", "3.12", "3.13"]
+        # Oldest version known to work, plus the currently supported LTS releases.
+        clickhouse-version: ["23.4", "26.3", "26.8"]
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python '${{ matrix.python-version }}'
@@ -63,10 +73,15 @@ jobs:
     runs-on: ubuntu-latest
     services:
       clickhouse-server:
-        image: clickhouse/clickhouse-server:23.4-alpine
+        image: clickhouse/clickhouse-server:26.8-alpine
+        env:
+          CLICKHOUSE_SKIP_USER_SETUP: "1"
         ports:
           - 18123:8123
           - 19000:9000
+        options: >-
+          --health-cmd "clickhouse-client --query 'SELECT 1'"
+          --health-interval 2s --health-timeout 5s --health-retries 30
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
