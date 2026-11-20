@@ -248,30 +248,40 @@ class ClickhouseConnector(SQLConnector):
         column_name: str,
         sql_type: sqlalchemy.types.TypeEngine,
     ) -> None:
-        """Adapt a column's type, also widening Float32 columns to Float64.
+        """Adapt a column's type to a new JSON schema type, if really needed.
 
-        Older versions created JSON `number` columns as Float32. The SDK's generic
-        type merging doesn't treat Float32 -> Float64 as a widening, so handle it
-        here; everything else goes to the SDK.
+        Versions before PR #51 created JSON `number` columns as Float32; the
+        current mapping is Float64. Such columns are deliberately *not* altered:
+        changing a column type on (possibly replicated, ON CLUSTER) production
+        tables must not happen as a side effect of a load. The ALTER that would
+        widen the column is logged so it can be run deliberately. Values keep
+        loading into the Float32 column, as with those older versions.
+
+        Everything else goes to the SDK, which only alters when the merged type
+        really differs (e.g. a source column changing from integer to string).
         """
         current_type = self._get_column_type(full_table_name, column_name)
         if _float_type(current_type) is clickhouse_sqlalchemy_types.Float32 and (
             _float_type(sql_type) is clickhouse_sqlalchemy_types.Float64
         ):
-            new_type: sqlalchemy.types.TypeEngine
-            new_type = clickhouse_sqlalchemy_types.Float64()
-            if isinstance(
-                current_type,
-                clickhouse_sqlalchemy_types.Nullable,
-            ) or isinstance(sql_type, clickhouse_sqlalchemy_types.Nullable):
-                new_type = clickhouse_sqlalchemy_types.Nullable(new_type)
+            # Keep the column's current nullability; only the width changes.
+            widened: sqlalchemy.types.TypeEngine
+            widened = clickhouse_sqlalchemy_types.Float64()
+            if isinstance(current_type, clickhouse_sqlalchemy_types.Nullable):
+                widened = clickhouse_sqlalchemy_types.Nullable(widened)
             alter_ddl = self.get_column_alter_ddl(
                 table_name=full_table_name,
                 column_name=column_name,
-                column_type=new_type.compile(dialect=self._engine.dialect),
+                column_type=widened,
             )
-            with self._connect() as conn, conn.begin():
-                conn.execute(alter_ddl)
+            self.logger.warning(
+                "Column %s.%s is Float32 (created by an older version); JSON numbers "
+                "now map to Float64. Not altering it automatically. To keep full "
+                "precision, run: %s",
+                full_table_name,
+                column_name,
+                alter_ddl.compile(dialect=self._engine.dialect),
+            )
             return
 
         super()._adapt_column_type(full_table_name, column_name, sql_type)
@@ -345,7 +355,7 @@ class ClickhouseConnector(SQLConnector):
         self,
         table_name: str,
         column_name: str,
-        column_type: sqlalchemy.types.TypeEngine,
+        column_type: sqlalchemy.types.TypeEngine | str,
     ) -> sqlalchemy.DDL:
         """Get the alter column DDL statement.
 
@@ -354,32 +364,35 @@ class ClickhouseConnector(SQLConnector):
         Args:
             table_name: Fully qualified table name of column to alter.
             column_name: Column name to alter.
-            column_type: New column type string.
+            column_type: New column type, as a SQLAlchemy type or a type string.
 
         Returns:
             A sqlalchemy DDL instance.
 
         """
-        if self.config.get("cluster_name"):
+        dialect = self._engine.dialect
+        if isinstance(column_type, sqlalchemy.types.TypeEngine):
+            # Render ClickHouse syntax (e.g. Nullable(Float64)), not a generic one.
+            column_type = column_type.compile(dialect=dialect)
+        context = {
+            "table_name": table_name,
+            "column_name": column_name,
+            "column_type": column_type,
+        }
+        cluster_name = self.config.get("cluster_name")
+        if cluster_name:
             return sqlalchemy.DDL(
-                (
-                    "ALTER TABLE %(table_name)s ON CLUSTER %(cluster_name)s "
-                    "MODIFY COLUMN %(column_name)s %(column_type)s",
-                ),
+                "ALTER TABLE %(table_name)s ON CLUSTER %(cluster_name)s "
+                "MODIFY COLUMN %(column_name)s %(column_type)s",
                 {
-                    "table_name": table_name,
-                    "column_name": column_name,
-                    "column_type": column_type,
-                    "cluster_name": self.config.get("cluster_name"),
+                    **context,
+                    # Quoted like the dialect does for CREATE TABLE ... ON CLUSTER.
+                    "cluster_name": dialect.identifier_preparer.quote(cluster_name),
                 },
             )
         return sqlalchemy.DDL(
             "ALTER TABLE %(table_name)s MODIFY COLUMN %(column_name)s %(column_type)s",
-            {
-                "table_name": table_name,
-                "column_name": column_name,
-                "column_type": column_type,
-            },
+            context,
         )
 
 
