@@ -461,25 +461,20 @@ zstd = ["clickhouse-cityhash (>=1.0.2.6)", "zstd"]
 
 [[package]]
 name = "clickhouse-sqlalchemy"
-version = "0.3.1"
+version = "0.3.2"
 description = "Simple ClickHouse SQLAlchemy Dialect"
 optional = false
-python-versions = ">=3.7, <4"
+python-versions = "<4,>=3.7"
 groups = ["main"]
-files = []
-develop = false
+files = [
+    {file = "clickhouse-sqlalchemy-0.3.2.tar.gz", hash = "sha256:267f3a9a1d0d186eb99a41895a684922d31125cea21702cd7dc73af1ccdd10e7"},
+]
 
 [package.dependencies]
 asynch = ">=0.2.2"
 clickhouse-driver = ">=0.1.2"
 requests = "*"
 sqlalchemy = ">=2.0.0,<2.1.0"
-
-[package.source]
-type = "git"
-url = "https://github.com/xzkostyan/clickhouse-sqlalchemy.git"
-reference = "7ad94b0"
-resolved_reference = "7ad94b03e747713a62d2aaca3c025d6d60a26e17"
 
 [[package]]
 name = "colorama"
@@ -2117,4 +2112,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.14"
-content-hash = "6c2cf541caa4bf732205c197c76c6c5af3a3164cc531ef6753048198526c0765"
+content-hash = "070542905beef3597a8ca1a7d1cac11c4bea14a86cf7e03360398533a3be2272"
