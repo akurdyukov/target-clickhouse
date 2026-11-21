@@ -10,8 +10,8 @@ keywords = [
 license = "Apache-2.0"
 requires-python = ">=3.11,<3.14"
 # The version is set from the git tag at release time (poetry-dynamic-versioning,
-# see release_workflow.yml), so it stays in [tool.poetry]. The dependencies stay
-# there too, because clickhouse-sqlalchemy is pinned to a git commit.
+# see release_workflow.yml), so it stays in [tool.poetry]. The dependencies are
+# in [tool.poetry.dependencies] as well.
 dynamic = ["version", "dependencies"]
 
 [project.scripts]
@@ -25,7 +25,8 @@ packages = [
 
 [tool.poetry.dependencies]
 singer-sdk = { version=">=0.54,<0.55" }
-clickhouse-sqlalchemy = { git = "https://github.com/xzkostyan/clickhouse-sqlalchemy.git", rev = "7ad94b0" }
+# 0.3.2 is the first release with the Date32 type.
+clickhouse-sqlalchemy = ">=0.3.2,<0.4"
 
 simplejson = ">=3.19.2,<5.0.0"
 pendulum = ">=2.1,<4"
