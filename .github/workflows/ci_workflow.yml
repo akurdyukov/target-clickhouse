@@ -6,9 +6,9 @@ jobs:
   linting:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version: "3.11"
 
@@ -51,9 +51,9 @@ jobs:
         # Oldest version known to work, plus the currently supported LTS releases.
         clickhouse-version: ["23.4", "26.3", "26.8"]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Set up Python '${{ matrix.python-version }}'
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version: '${{ matrix.python-version }}'
     - name: Install Poetry
@@ -80,7 +80,7 @@ jobs:
       matrix:
         clickhouse-version: ["23.4", "26.8"]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Start ClickHouse cluster
       run: |
         docker run -d --name clickhouse-cluster \
@@ -97,7 +97,7 @@ jobs:
         docker logs clickhouse-cluster | tail -50
         exit 1
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version: "3.11"
     - name: Install Poetry
@@ -132,10 +132,10 @@ jobs:
           --health-cmd "clickhouse-client --query 'SELECT 1'"
           --health-interval 2s --health-timeout 5s --health-retries 30
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Set up Python
       id: setup-python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version: "3.11"
     - name: Install dependencies
