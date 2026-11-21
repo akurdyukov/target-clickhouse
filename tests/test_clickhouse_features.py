@@ -120,29 +120,32 @@ def test_number_keeps_double_precision(engine, table):
     assert "Float64" in _column_types(engine, table)["amount"]
 
 
-def test_existing_float32_column_is_widened(engine, table):
-    """A Float32 column made by older versions is widened and loads full precision."""
+def test_existing_float32_column_is_not_altered(engine, table):
+    """A Float32 column made by older versions is kept as-is and still loads.
+
+    Widening it to Float64 is a schema change for a person to make deliberately
+    (the loader logs the ALTER statement); see ClickhouseConnector._adapt_column_type.
+    """
     _query(
         engine,
         f"CREATE TABLE {table} (id Int64, amount Float32) "
         "ENGINE = MergeTree ORDER BY id",
     )
     _query(engine, f"INSERT INTO {table} VALUES (1, 1.5)")
-    value = 1234567.891
     schema = {
         "type": "object",
         "properties": {"id": {"type": "integer"}, "amount": {"type": "number"}},
     }
     _run_target(
         {},
-        [_schema(table, schema), _record(table, {"id": 2, "amount": value})],
+        [_schema(table, schema), _record(table, {"id": 2, "amount": 2.25})],
     )
     _wait_for_mutations(engine, table)
 
-    assert "Float64" in _column_types(engine, table)["amount"]
+    assert _column_types(engine, table)["amount"] == "Float32"
     assert _query(engine, f"SELECT id, amount FROM {table} ORDER BY id") == [
         (1, 1.5),
-        (2, value),
+        (2, 2.25),
     ]
 
 

@@ -69,6 +69,55 @@ jobs:
       run: |
         poetry run pytest --capture=no
 
+  cluster:
+    # ON CLUSTER / Replicated* engines against a one-node cluster named `test_cluster`
+    # with embedded Keeper (tests/clickhouse/cluster.xml). A service container
+    # can't mount files from the checkout, so the server is started in a step.
+    name: cluster (ClickHouse ${{ matrix.clickhouse-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        clickhouse-version: ["23.4", "26.8"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Start ClickHouse cluster
+      run: |
+        docker run -d --name clickhouse-cluster \
+          -p 18123:8123 -p 19000:9000 \
+          -e CLICKHOUSE_SKIP_USER_SETUP=1 \
+          -v "$PWD/tests/clickhouse/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro" \
+          "clickhouse/clickhouse-server:${{ matrix.clickhouse-version }}-alpine"
+        for i in $(seq 1 60); do
+          if curl -sf "http://localhost:18123/?query=SELECT%20count()%20FROM%20system.clusters%20WHERE%20cluster='test_cluster'" | grep -q '^1$'; then
+            echo "cluster ready"; exit 0
+          fi
+          sleep 2
+        done
+        docker logs clickhouse-cluster | tail -50
+        exit 1
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+    - name: Install Poetry
+      env:
+        PIP_CONSTRAINT: .github/workflows/constraints.txt
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+    - name: Install dependencies
+      run: |
+        poetry install
+    - name: Test against the cluster
+      env:
+        CLICKHOUSE_CLUSTER: test_cluster
+      run: |
+        poetry run pytest --capture=no -v tests/test_cluster.py
+    - name: ClickHouse server log on failure
+      if: failure()
+      run: docker logs clickhouse-cluster 2>&1 | tail -100
+
   integration:
     runs-on: ubuntu-latest
     services:
