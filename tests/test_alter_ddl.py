@@ -123,6 +123,40 @@ def test_type_mapping(schema, is_primary_key, expected):
     assert _compile(connector, sql_type) == expected
 
 
+@pytest.mark.parametrize(
+    ("schema", "is_primary_key", "expected"),
+    [
+        # Where the SDK's default JSONSchemaToSQL would pick other types.
+        ({"type": "string", "format": "uuid"}, False, "VARCHAR"),
+        ({"type": "string", "format": "email"}, False, "VARCHAR"),
+        ({"type": "string", "format": "x-singer.decimal"}, False, "VARCHAR"),
+        ({"type": ["integer", "number"]}, False, "Int64"),
+        ({"type": ["number", "boolean", "null"]}, False, "Nullable(Float64)"),
+        (
+            {"type": ["string", "integer"], "format": "date-time"},
+            False,
+            "Nullable(DATETIME)",
+        ),
+        ({"anyOf": [{"type": "integer"}, {"type": "string"}]}, False, "VARCHAR"),
+        (
+            {"anyOf": [{"type": "string", "format": "date"}, {"type": "null"}]},
+            False,
+            "Nullable(Date32)",
+        ),
+        # Same as the SDK defaults.
+        ({"type": ["string", "null"], "maxLength": 10}, False, "Nullable(VARCHAR(10))"),
+        ({"type": "string", "format": "date"}, True, "Date32"),
+        ({"type": "string", "format": "time"}, False, "Nullable(TIME)"),
+        ({}, False, "VARCHAR"),
+    ],
+)
+def test_type_mapping_matches_earlier_versions(schema, is_primary_key, expected):
+    """Edge cases keep the types earlier versions (legacy `to_sql_type`) created."""
+    connector = _connector()
+    sql_type = connector.to_sql_type(schema, is_primary_key=is_primary_key)
+    assert _compile(connector, sql_type) == expected
+
+
 # --- when prepare_column alters an existing column ----------------------------------
 
 

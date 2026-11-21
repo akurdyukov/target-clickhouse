@@ -6,12 +6,11 @@ from target_clickhouse.connectors import ClickhouseConnector
 
 
 def _to_sql_type(jsonschema_type, is_primary_key=False):
-    """Call to_sql_type as an unbound method — avoids full connector init."""
-    return ClickhouseConnector.to_sql_type(
-        None,
-        jsonschema_type,
-        is_primary_key=is_primary_key,
+    """Map a JSON schema with a connector that never connects."""
+    connector = ClickhouseConnector(
+        config={"sqlalchemy_url": "clickhouse+http://default:@localhost:1/default"},
     )
+    return connector.to_sql_type(jsonschema_type, is_primary_key=is_primary_key)
 
 
 class TestNullableTypeMapping:
