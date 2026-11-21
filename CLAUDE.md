@@ -25,7 +25,7 @@ meltano run tap-smoke-test target-clickhouse   # end-to-end smoke test (CI "inte
 - pytest turns `DeprecationWarning`/`PendingDeprecationWarning` into errors (`[tool.pytest.ini_options]` in `pyproject.toml`), so SDK deprecations fail the tests; import from the non-deprecated paths (e.g. `JSONSchemaToSQL` from `singer_sdk.sql.connector`, `SingerTestSuite`) and don't use `SQLConnector.connection` (use `_connect()`).
 - CI runs pytest for every combination of Python 3.11/3.12/3.13 and ClickHouse 23.4/26.3/26.8 (`-alpine` images, with `CLICKHOUSE_SKIP_USER_SETUP=1` because newer images block network logins for the passwordless `default` user). Lint and the Meltano integration job run on Python 3.11, integration against ClickHouse 26.8.
 - Recent setuptools no longer ships `pkg_resources`; avoid dependencies that import it (the old pyfilesystem2 `fs` package does, which is why the unused `s3` extra was removed).
-- Releases: creating a GitHub release triggers `release_workflow.yml`, which uses `poetry-dynamic-versioning` (version comes from the git tag) and publishes to PyPI.
+- Releases: creating a GitHub release triggers `release_workflow.yml`, which uses `poetry-dynamic-versioning` (version comes from the git tag) and publishes to PyPI. Package metadata is in the PEP 621 `[project]` table; `version` and `dependencies` are declared `dynamic` and stay in `[tool.poetry]` (the plugin rewrites the version there; the clickhouse-sqlalchemy git pin is Poetry syntax).
 
 ## Architecture
 
