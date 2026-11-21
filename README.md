@@ -4,25 +4,29 @@
 
 Build with the [Meltano Target SDK](https://sdk.meltano.com).
 
-<!--
-
-Developer TODO: Update the below as needed to correctly describe the install procedure. For instance, if you do not have a PyPi repo, or if you want users to directly install from your git repo, you can modify this step as appropriate.
-
 ## Installation
 
-Install from PyPi:
+Install from PyPI (the command is `target-clickhouse`):
 
 ```bash
-pipx install target-clickhouse
+pipx install akurdyukov-target-clickhouse
 ```
 
 Install from GitHub:
 
 ```bash
-pipx install git+https://github.com/ORG_NAME/target-clickhouse.git@main
+pipx install git+https://github.com/akurdyukov/target-clickhouse.git@master
 ```
 
--->
+In Meltano:
+
+```yaml
+loaders:
+- name: target-clickhouse
+  namespace: target_clickhouse
+  pip_url: akurdyukov-target-clickhouse
+  executable: target-clickhouse
+```
 
 ## Configuration
 

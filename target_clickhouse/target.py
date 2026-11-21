@@ -13,6 +13,8 @@ class TargetClickhouse(SQLTarget):
     """SQL-based target for Clickhouse."""
 
     name = "target-clickhouse"
+    # The distribution name, used to look up the installed version for --about.
+    package_name = "akurdyukov-target-clickhouse"
 
     config_jsonschema = th.PropertiesList(
         # connection properties

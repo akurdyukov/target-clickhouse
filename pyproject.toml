@@ -1,5 +1,5 @@
 [project]
-name = "shaped-target-clickhouse"
+name = "akurdyukov-target-clickhouse"
 description = "`target-clickhouse` is a Singer target for clickhouse, built with the Meltano Singer SDK."
 readme = "README.md"
 authors = [{ name = "Ben Theunissen" }]
@@ -13,6 +13,10 @@ requires-python = ">=3.11,<3.14"
 # see release_workflow.yml), so it stays in [tool.poetry]. The dependencies are
 # in [tool.poetry.dependencies] as well.
 dynamic = ["version", "dependencies"]
+
+[project.urls]
+Repository = "https://github.com/akurdyukov/target-clickhouse"
+Issues = "https://github.com/akurdyukov/target-clickhouse/issues"
 
 [project.scripts]
 target-clickhouse = "target_clickhouse.target:TargetClickhouse.cli"

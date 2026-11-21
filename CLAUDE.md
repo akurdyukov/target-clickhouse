@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Singer target that loads data into ClickHouse, built on the Meltano Singer SDK (`singer-sdk` `>=0.54,<0.55`; import SQL classes from `singer_sdk.sql`, the old `singer_sdk.connectors`/`singer_sdk.sinks` paths go away in 0.57) and `clickhouse-sqlalchemy` (`>=0.3.2,<0.4` from PyPI; 0.3.2 is the first release with `Date32`. Don't use git/URL dependencies: PyPI rejects packages that have them). Published to PyPI as `shaped-target-clickhouse`; the CLI entry point is `target-clickhouse` (`target_clickhouse.target:TargetClickhouse.cli`). Python `>=3.11,<3.14`; with an out-of-range system Python, `poetry python install 3.13 && poetry env use 3.13` (Poetry refuses to lock or install with an out-of-range interpreter).
+Singer target that loads data into ClickHouse, built on the Meltano Singer SDK (`singer-sdk` `>=0.54,<0.55`; import SQL classes from `singer_sdk.sql`, the old `singer_sdk.connectors`/`singer_sdk.sinks` paths go away in 0.57) and `clickhouse-sqlalchemy` (`>=0.3.2,<0.4` from PyPI; 0.3.2 is the first release with `Date32`. Don't use git/URL dependencies: PyPI rejects packages that have them). Published to PyPI as `akurdyukov-target-clickhouse` (upstream publishes `shaped-target-clickhouse`); the CLI entry point is `target-clickhouse` (`target_clickhouse.target:TargetClickhouse.cli`). Python `>=3.11,<3.14`; with an out-of-range system Python, `poetry python install 3.13 && poetry env use 3.13` (Poetry refuses to lock or install with an out-of-range interpreter).
 
 ## Commands
 
@@ -20,12 +20,12 @@ poetry run target-clickhouse --about  # print config schema/capabilities
 meltano run tap-smoke-test target-clickhouse   # end-to-end smoke test (CI "integration" job)
 ```
 
-- Tests in `tests/test_core.py` and `tests/test_clickhouse_features.py` need a live ClickHouse on port 18123 (and 19000 for the native driver). `test_engine_class.py`, `test_connection_url.py`, `test_missing_values.py`, `test_nullable_types.py` and `test_validation.py` are pure unit tests and need no DB.
+- Tests in `tests/test_core.py` and `tests/test_clickhouse_features.py` need a live ClickHouse on port 18123 (and 19000 for the native driver). `test_engine_class.py`, `test_connection_url.py`, `test_package.py`, `test_missing_values.py`, `test_nullable_types.py` and `test_validation.py` are pure unit tests and need no DB.
 - Ruff runs with `select = ["ALL"]` plus an ignore list in `pyproject.toml`; pre-commit also runs mypy.
 - pytest turns `DeprecationWarning`/`PendingDeprecationWarning` into errors (`[tool.pytest.ini_options]` in `pyproject.toml`), so SDK deprecations fail the tests; import from the non-deprecated paths (e.g. `JSONSchemaToSQL` from `singer_sdk.sql.connector`, `SingerTestSuite`) and don't use `SQLConnector.connection` (use `_connect()`).
 - CI runs pytest for every combination of Python 3.11/3.12/3.13 and ClickHouse 23.4/26.3/26.8 (`-alpine` images, with `CLICKHOUSE_SKIP_USER_SETUP=1` because newer images block network logins for the passwordless `default` user). Lint and the Meltano integration job run on Python 3.11, integration against ClickHouse 26.8.
 - Recent setuptools no longer ships `pkg_resources`; avoid dependencies that import it (the old pyfilesystem2 `fs` package does, which is why the unused `s3` extra was removed).
-- Releases: creating a GitHub release triggers `release_workflow.yml`, which uses `poetry-dynamic-versioning` (version comes from the git tag) and publishes to PyPI. Package metadata is in the PEP 621 `[project]` table; `version` and `dependencies` are declared `dynamic` and stay in `[tool.poetry]` (the plugin rewrites the version there).
+- Releases: publishing a GitHub release (tag `vX.Y.Z`) triggers `release_workflow.yml`: it builds with `poetry-dynamic-versioning` (version comes from the git tag), checks the wheel version matches the tag, attaches the wheel to the release, and uploads to PyPI via trusted publishing (GitHub environment `pypi`, no token secret). Package metadata is in the PEP 621 `[project]` table; `version` and `dependencies` are declared `dynamic` and stay in `[tool.poetry]` (the plugin rewrites the version there).
 
 ## Architecture
 
