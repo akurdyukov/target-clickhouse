@@ -11,14 +11,94 @@ from clickhouse_sqlalchemy import (
 from clickhouse_sqlalchemy import (
     types as clickhouse_sqlalchemy_types,
 )
-from singer_sdk import typing as th
 from singer_sdk.sql import SQLConnector
+from singer_sdk.sql.connector import JSONSchemaToSQL
 from sqlalchemy import Column, MetaData, create_engine
 
 from target_clickhouse.engine_class import SupportedEngines, create_engine_wrapper
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
+
+# Date and time column types; made Nullable (unless a primary key) because
+# ClickHouse would otherwise store NULL as the epoch.
+_DATELIKE_TYPES = (
+    sqlalchemy.types.DATETIME,
+    sqlalchemy.types.TIME,
+    clickhouse_sqlalchemy_types.Date32,
+)
+
+
+def _allows_type(schema: dict, json_type: str) -> bool:
+    """Whether `schema` (or one of its `anyOf` alternatives) allows `json_type`."""
+    schema_type = schema.get("type")
+    if isinstance(schema_type, (list, tuple)):
+        if json_type in schema_type:
+            return True
+    elif schema_type == json_type:
+        return True
+    return any(_allows_type(sub, json_type) for sub in schema.get("anyOf", ()))
+
+
+class ClickhouseJSONSchemaToSQL(JSONSchemaToSQL):
+    """Map JSON Schema types to ClickHouse column types.
+
+    The mapping is the one this target has always used (it must not change, or
+    existing tables would get ALTERed), which differs from the SDK defaults:
+
+    - `number` is `Float64`: ClickHouse needs a precision for `Decimal`, and a
+      generic `FLOAT` is `Float32` (about 7 significant digits).
+    - `integer` is `Int64`; `date` is `Date32`, which supports pre-epoch dates.
+    - Other string formats (`uuid`, `email`, `x-singer.decimal`, ...) stay strings.
+    - With several allowed types, the first of `JSON_TYPE_PRECEDENCE` wins (any
+      type that allows `object`, `array` or `string` is a string column), also
+      across `anyOf` alternatives; the SDK defaults would use the first matching
+      alternative instead.
+
+    `Nullable` is added by `ClickhouseConnector.to_sql_type`.
+    """
+
+    #: JSON types in the order they are checked; the first one allowed decides.
+    JSON_TYPE_PRECEDENCE = ("object", "array", "string", "integer", "number", "boolean")
+
+    #: Column types for the date-like string formats.
+    DATELIKE_FORMATS: typing.ClassVar[dict[str, type[sqlalchemy.types.TypeEngine]]] = {
+        "date-time": sqlalchemy.types.DATETIME,
+        "time": sqlalchemy.types.TIME,
+        "date": clickhouse_sqlalchemy_types.Date32,
+    }
+
+    def to_sql_type(self, schema: dict) -> sqlalchemy.types.TypeEngine:
+        """Return the ClickHouse type (before `Nullable`) for a JSON Schema.
+
+        Args:
+            schema: The JSON Schema of one property.
+
+        Returns:
+            The column type.
+
+        """
+        handlers: dict[str, typing.Callable[[dict], sqlalchemy.types.TypeEngine]] = {
+            "object": lambda _: sqlalchemy.types.VARCHAR(),
+            "array": lambda _: sqlalchemy.types.VARCHAR(),
+            "string": self._string_type,
+            "integer": lambda _: clickhouse_sqlalchemy_types.Int64(),
+            "number": lambda _: clickhouse_sqlalchemy_types.Float64(),
+            "boolean": lambda _: sqlalchemy.types.BOOLEAN(),
+        }
+        for json_type in self.JSON_TYPE_PRECEDENCE:
+            if _allows_type(schema, json_type):
+                return handlers[json_type](schema)
+        return self.fallback_type()
+
+    def _string_type(self, schema: dict) -> sqlalchemy.types.TypeEngine:
+        # A date-like format on the schema or on one of its string alternatives.
+        for candidate in (schema, *schema.get("anyOf", ())):
+            if "string" in candidate.get("type", ()):
+                type_class = self.DATELIKE_FORMATS.get(candidate.get("format", ""))
+                if type_class is not None:
+                    return type_class()
+        return self.handle_raw_string(schema)
 
 
 class ClickhouseConnector(SQLConnector):
@@ -33,6 +113,8 @@ class ClickhouseConnector(SQLConnector):
     allow_column_alter: bool = True  # Whether altering column types is supported.
     allow_merge_upsert: bool = False  # Whether MERGE UPSERT is supported.
     allow_temp_tables: bool = True  # Whether temp tables are supported.
+
+    jsonschema_to_sql_converter = ClickhouseJSONSchemaToSQL
 
     def get_sqlalchemy_url(self, config: dict) -> str:
         """Generates a SQLAlchemy URL for clickhouse.
@@ -91,51 +173,24 @@ class ClickhouseConnector(SQLConnector):
         jsonschema_type: dict,
         **kwargs,
     ) -> sqlalchemy.types.TypeEngine:
-        """Return a JSON Schema representation of the provided type.
+        """Return the ClickHouse column type for a JSON Schema property.
 
-        Developers may override this method to accept additional input argument types,
-        to support non-standard types, or to provide custom typing logic.
+        The base type comes from `ClickhouseJSONSchemaToSQL`; this adds `Nullable`
+        where ClickHouse needs it.
 
         Args:
             jsonschema_type: The JSON Schema representation of the source type.
+            **kwargs: `is_primary_key=True` keeps the type non-nullable.
 
         Returns:
             The SQLAlchemy type representation of the data type.
 
         """
-        sql_type = th.to_sql_type(jsonschema_type)
+        sql_type = self.jsonschema_to_sql.to_sql_type(jsonschema_type)
         is_primary_key = kwargs.get("is_primary_key", False)
 
-        # Clickhouse does not support the DECIMAL type without providing precision,
-        # so use a float. It must be Float64: a generic FLOAT is Float32 in
-        # ClickHouse and keeps only ~7 significant digits.
-        if type(sql_type) == sqlalchemy.types.DECIMAL:
-            sql_type = typing.cast(
-                sqlalchemy.types.TypeEngine,
-                clickhouse_sqlalchemy_types.Float64(),
-            )
-        elif type(sql_type) == sqlalchemy.types.INTEGER:
-            sql_type = typing.cast(
-                sqlalchemy.types.TypeEngine,
-                clickhouse_sqlalchemy_types.Int64(),
-            )
-        elif type(sql_type) == sqlalchemy.types.DATE:
-            sql_type = typing.cast(
-                sqlalchemy.types.TypeEngine,
-                clickhouse_sqlalchemy_types.Nullable(clickhouse_sqlalchemy_types.Date32)
-                if not is_primary_key
-                else clickhouse_sqlalchemy_types.Date32,
-            )
         # All date and time types should be flagged as Nullable to allow for NULL value.
-        elif (
-            type(sql_type)
-            in [
-                sqlalchemy.types.TIMESTAMP,
-                sqlalchemy.types.TIME,
-                sqlalchemy.types.DATETIME,
-            ]
-            and not is_primary_key
-        ):
+        if isinstance(sql_type, _DATELIKE_TYPES) and not is_primary_key:
             sql_type = clickhouse_sqlalchemy_types.Nullable(sql_type)
 
         # Wrap any type in Nullable if the JSON schema allows null values
