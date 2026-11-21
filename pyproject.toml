@@ -1,20 +1,29 @@
-[tool.poetry]
+[project]
 name = "shaped-target-clickhouse"
-version = "0.2.5"
 description = "`target-clickhouse` is a Singer target for clickhouse, built with the Meltano Singer SDK."
 readme = "README.md"
-authors = ["Ben Theunissen"]
+authors = [{ name = "Ben Theunissen" }]
 keywords = [
     "ELT",
     "clickhouse",
 ]
 license = "Apache-2.0"
+requires-python = ">=3.11,<3.14"
+# The version is set from the git tag at release time (poetry-dynamic-versioning,
+# see release_workflow.yml), so it stays in [tool.poetry]. The dependencies stay
+# there too, because clickhouse-sqlalchemy is pinned to a git commit.
+dynamic = ["version", "dependencies"]
+
+[project.scripts]
+target-clickhouse = "target_clickhouse.target:TargetClickhouse.cli"
+
+[tool.poetry]
+version = "0.2.5"
 packages = [
     { include = "target_clickhouse" },
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.14"
 singer-sdk = { version=">=0.54,<0.55" }
 clickhouse-sqlalchemy = { git = "https://github.com/xzkostyan/clickhouse-sqlalchemy.git", rev = "7ad94b0" }
 
@@ -86,9 +95,5 @@ disable_error_code = ["name-defined"]
 ignore_missing_imports = true
 
 [build-system]
-requires = ["poetry-core>=1.5.1"]
+requires = ["poetry-core>=2.0"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.scripts]
-# CLI declaration
-target-clickhouse = 'target_clickhouse.target:TargetClickhouse.cli'
