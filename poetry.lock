@@ -1841,14 +1841,14 @@ files = [
 
 [[package]]
 name = "types-simplejson"
-version = "3.19.0.20240310"
+version = "4.3.0.20261112"
 description = "Typing stubs for simplejson"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["dev"]
 files = [
-    {file = "types-simplejson-3.19.0.20240310.tar.gz", hash = "sha256:2831366f70d5d55832c3d978dff7c989575d55fb38621d086dbfee7a30c2b500"},
-    {file = "types_simplejson-3.19.0.20240310-py3-none-any.whl", hash = "sha256:6f06d8e50112bc931863a40e2cf463a99223d55fe07f275826fa969962bb56a4"},
+    {file = "types_simplejson-4.3.0.20261112-py3-none-any.whl", hash = "sha256:ef066526755d5d8e82a037d335ad4ef6123c14488d83af63cb0f10d640a288c9"},
+    {file = "types_simplejson-4.3.0.20261112.tar.gz", hash = "sha256:33cf64539eaa674b1bd37be591c44b3b583ad5340d46d3b85632850bd76d4d16"},
 ]
 
 [[package]]
@@ -2112,4 +2112,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.14"
-content-hash = "070542905beef3597a8ca1a7d1cac11c4bea14a86cf7e03360398533a3be2272"
+content-hash = "20b960eb3173dbcb74ef2bf0d37171010497d17006daa214e31a1e0f97ce62ba"
