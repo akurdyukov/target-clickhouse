@@ -79,7 +79,7 @@ def engine() -> t.Iterator[sqlalchemy.engine.Engine]:
     eng.dispose()
 
 
-@pytest.fixture()
+@pytest.fixture
 def table(engine) -> t.Iterator[str]:
     """A fresh table name; unique per run because Keeper paths outlive DROP."""
     name = f"cluster_{uuid.uuid4().hex[:12]}"

@@ -43,7 +43,7 @@ def _query(engine, sql: str) -> list[tuple]:
         return [tuple(row) for row in conn.execute(sqlalchemy.text(sql)).fetchall()]
 
 
-@pytest.fixture()
+@pytest.fixture
 def table(engine, request) -> t.Iterator[str]:
     """A unique table/stream name, dropped before and after the test."""
     name = "it_" + re.sub(r"\W", "_", request.node.name).lower()

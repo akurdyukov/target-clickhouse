@@ -38,10 +38,10 @@ packaging = ">=24.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=7.4.3"
-tox = "^3.25.0"
-ruff = "^0.1.3"
+tox = "^4.67.15"
+ruff = "^0.17.6"
 singer-sdk = { version=">=0.54,<0.55", extras = ["testing"] }
-types-simplejson = "^3.19.0.1"
+types-simplejson = "^4.3.0.20261112"
 types-setuptools = "^84.2.0.20261104"
 pre-commit = "^4.7.0"
 
@@ -53,11 +53,15 @@ filterwarnings = [
 ]
 
 [tool.ruff]
+src = ["target_clickhouse"]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["ALL"]
 ignore = [
     "ANN001", # missing-return-type
-    "ANN101",  # missing-type-self
-    "ANN102",  # missing-type-cls
     "ANN201",  # missing-return-type-doc
+    "CPY001", # Missing copyright notice at top of file
     "D100", # Missing docstring in public module
     "D101", # Missing docstring in public class
     "D103", # Missing docstring in public function
@@ -68,8 +72,8 @@ ignore = [
     "FA100", # Forbidden import
     "S101", # Use of assert detected
     "G004", # Logging statement uses string formatting
-    "TCH002",
-    "TCH003",
+    "TC002",
+    "TC003",
     "ANN202",
     "C901",
     "TRY201", # Use of bare 'except'
@@ -78,22 +82,19 @@ ignore = [
     "FBT001",
     "FBT002",
 ]
-select = ["ALL"]
-src = ["target_clickhouse"]
-target-version = "py37"
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 # Tests build SQL from their own fixed table names.
 "tests/*" = ["S608"]
 
-[tool.ruff.flake8-annotations]
+[tool.ruff.lint.flake8-annotations]
 allow-star-arg-any = true
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["target_clickhouse"]
 
-[tool.ruff.pylint]
-max-args=6
+[tool.ruff.lint.pylint]
+max-args = 6
 
 [[tool.mypy.overrides]]
 disable_error_code = ["name-defined"]

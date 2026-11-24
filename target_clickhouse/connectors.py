@@ -5,6 +5,7 @@ import typing
 from typing import TYPE_CHECKING
 
 import sqlalchemy.types
+import urllib3
 from clickhouse_sqlalchemy import (
     Table,
 )
@@ -137,8 +138,6 @@ class ClickhouseConnector(SQLConnector):
                     secure_options += "&verify=False"
 
                     # disable urllib3 warning
-                    import urllib3
-
                     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
             else:
                 secure_options = "protocol=http"
