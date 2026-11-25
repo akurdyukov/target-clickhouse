@@ -42,7 +42,7 @@ tox = "^4.67.15"
 ruff = "^0.17.6"
 singer-sdk = { version=">=0.54,<0.55", extras = ["testing"] }
 types-simplejson = "^4.3.0.20261112"
-types-setuptools = "^84.2.0.20261104"
+types-setuptools = "^84.2.0.20261122"
 pre-commit = "^4.7.0"
 
 [tool.pytest.ini_options]
