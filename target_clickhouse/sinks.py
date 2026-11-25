@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from logging import Logger
-from typing import Any, Iterable
+from typing import Any
 
 import jsonschema.exceptions as jsonschema_exceptions
 import simplejson as json
